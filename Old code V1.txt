@@ -1,0 +1,350 @@
+/* USER CODE BEGIN Header */
+/**
+  ******************************************************************************
+  * @file           : main.c
+  * @brief          : Main program body
+  ******************************************************************************
+  * @attention
+  *
+  * <h2><center>&copy; Copyright (c) 2020 STMicroelectronics.
+  * All rights reserved.</center></h2>
+  *
+  * This software component is licensed by ST under BSD 3-Clause license,
+  * the "License"; You may not use this file except in compliance with the
+  * License. You may obtain a copy of the License at:
+  *                        opensource.org/licenses/BSD-3-Clause
+  * Date: 07.05.25
+	* Auther: Henri Mott
+	* Date modif�: 07.05.25
+	*
+  ******************************************************************************
+  */
+/* USER CODE END Header */
+/* Includes ------------------------------------------------------------------*/
+#include "main.h"
+#include "adc.h"
+#include "tim.h"
+#include "gpio.h"
+
+/* Private includes ----------------------------------------------------------*/
+/* USER CODE BEGIN Includes */
+
+#include "17400.h"
+#include "stm32delays.h"
+#include "stm32driverlcd.h"
+
+
+/* USER CODE END Includes */
+
+/* Private typedef -----------------------------------------------------------*/
+/* USER CODE BEGIN PTD */
+
+
+/* USER CODE END PTD */
+
+/* Private define ------------------------------------------------------------*/
+/* USER CODE BEGIN PD */
+
+
+/* USER CODE END PD */
+
+/* Private macro -------------------------------------------------------------*/
+/* USER CODE BEGIN PM */
+
+/* USER CODE END PM */
+
+/* Private variables ---------------------------------------------------------*/
+
+/* USER CODE BEGIN PV */
+uint32_t led_counter = 0;  // Counter for LED blinking
+uint8_t motor_direction = 0;  // 0 = forward, 1 = reverse
+uint8_t motor_enabled = 0;    // 0 = disabled, 1 = enabled
+/* USER CODE END PV */
+
+/* Private function prototypes -----------------------------------------------*/
+void SystemClock_Config(void);
+/* USER CODE BEGIN PFP */
+void motor_enable(void);
+void motor_set_direction(uint8_t direction);
+/* USER CODE END PFP */
+
+/* Private user code ---------------------------------------------------------*/
+/* USER CODE BEGIN 0 */
+
+// Timer 6 period elapsed callback
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+{
+    if (htim->Instance == TIM6)
+    {
+        led_counter++;
+        if(led_counter >= 500)  // Toggle every 500ms for visible blinking
+        {
+            HAL_GPIO_TogglePin(LED0_PORT, LED0_BIT);
+            led_counter = 0;
+        }
+    }
+}
+
+// *** ADC ***
+//************************************************************** 
+// Description : Lecture AD
+// Paramètres d'entrée : 
+// N° du canal à lire
+// Paramètres de sortie :
+// Valeure lue en LSB
+//**************************************************************
+// Lecture d'un canal AD par polling
+// Il faut auparavant avoir configur� la/les pin(s) concern�e(s) en entr�e analogique
+uint16_t Adc_read(uint8_t chNr)
+{
+	  uint16_t ValRetour;
+		hadc.Instance->CHSELR = ADC_CHSELR_CHANNEL(chNr);  
+	
+		HAL_ADC_Start(&hadc);
+		HAL_ADC_PollForConversion(&hadc, HAL_MAX_DELAY);
+		ValRetour = HAL_ADC_GetValue(&hadc);
+		HAL_ADC_Stop(&hadc);
+		return(ValRetour);
+}
+
+// ----------------------------------------------------------------
+
+// ----------------------------------------------------------------
+	// *** A COMPLETER ! ***
+	// Mettez vos fonctions ici...
+	
+// ----------------------------------------------------------------
+
+/* USER CODE END 0 */
+
+/**
+  * @brief  The application entry point.
+  * @retval int
+  */
+int main(void)
+{
+  /* USER CODE BEGIN 1 */
+	//variables
+	// *** A COMPLETER ! ***
+	uint8_t duty_cycle = 200;  // Set to 150 for a more visible PWM (50%)
+	
+	// Variables for button states
+	uint8_t Btn0;           // Current state of button 0
+	uint8_t Btn0_Old;       // Previous state of button 0
+	uint8_t Btn1;           // Current state of button 1  
+	uint8_t Btn1_Old;       // Previous state of button 1
+	uint8_t Btn2;           // Current state of button 2
+	uint8_t Btn2_Old;       // Previous state of button 2
+	// *** A COMPLETER ! ***
+	
+
+  /* USER CODE END 1 */
+
+  /* MCU Configuration--------------------------------------------------------*/
+
+  /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
+  HAL_Init();
+
+  /* USER CODE BEGIN Init */
+	
+  /* USER CODE END Init */
+
+  /* Configure the system clock */
+  SystemClock_Config();
+
+  /* USER CODE BEGIN SysInit */
+
+  /* USER CODE END SysInit */
+
+  /* Initialize all configured peripherals */
+  MX_GPIO_Init();
+  MX_TIM6_Init();
+  MX_TIM16_Init();
+  MX_ADC_Init();
+  MX_TIM17_Init();
+	lcd_init();
+	
+  /* USER CODE BEGIN 2 */
+	
+		// Start timers
+	HAL_TIM_Base_Start_IT(&htim6);  //Start Timer 6 for LED blinking
+	HAL_TIM_PWM_Start(&htim16, TIM_CHANNEL_1); //Start Timer 16 PWM on PB8
+	HAL_TIM_PWM_Start(&htim17, TIM_CHANNEL_1); //Start Timer 16 PWM on PB8
+
+	
+
+	
+  /* USER CODE END 2 */
+
+  /* Infinite loop */
+  /* USER CODE BEGIN WHILE */
+  while (1)
+  {
+		
+    /* USER CODE END WHILE */
+
+    /* USER CODE BEGIN 3 */
+		//lcd_b1_on();
+		
+		// Read current button states
+		Btn0 = HAL_GPIO_ReadPin(BTN0_PORT, BTN0_BIT);
+		Btn1 = HAL_GPIO_ReadPin(BTN1_PORT, BTN1_BIT);
+		Btn2 = HAL_GPIO_ReadPin(BTN2_PORT, BTN2_BIT);
+		
+		__HAL_TIM_SET_COMPARE(&htim16, TIM_CHANNEL_1, duty_cycle);  // Set PWM duty cycle for Servo
+		__HAL_TIM_SET_COMPARE(&htim17, TIM_CHANNEL_1, duty_cycle);  // Set PWM duty cycle
+
+		// Partie ADC
+		uint16_t adc_value = Adc_read(0);  // channel_number is which pin you want to read
+		duty_cycle = adc_value /14;
+		
+		//lcd_clearLine(1);
+		lcd_gotoxy(1,1);
+		printf_lcd("%d ", adc_value);
+		//lcd_clearLine(2);
+		lcd_gotoxy(1,2);
+		printf_lcd("%d ", duty_cycle);
+		//lcd_clearLine(1);
+		HAL_GPIO_WritePin(LED0_PORT, LED0_BIT, GPIO_PIN_RESET);	// Turn led 0 on GPIO_PIN_SET GPIO_PIN_RESET
+		
+		
+		// ---Partie pour le moteur--- //
+		
+	//		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_2, GPIO_PIN_SET);  // Enable motor driver (nSLEEP active low) GPIO_PIN_RESET
+//		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_4, GPIO_PIN_SET);   // IN1 high direction
+
+		// Motor control section
+		if((Btn1 != Btn1_Old) && (Btn1 == 0))  // Button 1 pressed (active low)
+		{
+			motor_enable();  // Toggle motor enable state
+		}
+		
+		// Motor Direction
+		if((Btn2 != Btn2_Old) && (Btn2 == 0))  // Button 2 pressed (active low)
+		{
+			if(motor_direction == 0)
+			{
+				motor_set_direction(1);  // Change to reverse
+				HAL_GPIO_WritePin(LED2_PORT, LED2_BIT, GPIO_PIN_SET);	// Turn led 2 off GPIO_PIN_SET GPIO_PIN_RESET
+			}
+			else
+			{
+				motor_set_direction(0);  // Change to forward
+				HAL_GPIO_WritePin(LED2_PORT, LED2_BIT, GPIO_PIN_RESET);	// Turn led 2 on GPIO_PIN_SET GPIO_PIN_RESET
+			}
+		}
+		
+		// Update previous button states
+		Btn0_Old = Btn0;
+		Btn1_Old = Btn1;
+		Btn2_Old = Btn2;
+  }
+  /* USER CODE END 3 */
+}
+
+/**
+  * @brief System Clock Configuration
+  * @retval None
+  */
+void SystemClock_Config(void)
+{
+  RCC_OscInitTypeDef RCC_OscInitStruct = {0};
+  RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
+
+  /** Initializes the RCC Oscillators according to the specified parameters
+  * in the RCC_OscInitTypeDef structure.
+  */
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI14|RCC_OSCILLATORTYPE_HSE;
+  RCC_OscInitStruct.HSEState = RCC_HSE_ON;
+  RCC_OscInitStruct.HSI14State = RCC_HSI14_ON;
+  RCC_OscInitStruct.HSI14CalibrationValue = 16;
+  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
+  RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
+  RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL6;
+  RCC_OscInitStruct.PLL.PREDIV = RCC_PREDIV_DIV1;
+  if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /** Initializes the CPU, AHB and APB buses clocks
+  */
+  RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
+                              |RCC_CLOCKTYPE_PCLK1;
+  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
+  RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
+  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV1;
+
+  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /** Enables the Clock Security System
+  */
+  HAL_RCC_EnableCSS();
+}
+
+/* USER CODE BEGIN 4 */
+
+// ----------------------------------------------------------------
+// *** Motor Control Functions ***
+void motor_enable(void)
+{
+    if(motor_enabled == 0)
+    {
+        HAL_GPIO_WritePin(GPIOB, GPIO_PIN_2, GPIO_PIN_RESET);  // Enable motor driver (nSLEEP active low)
+        HAL_GPIO_WritePin(LED1_PORT, LED1_BIT, GPIO_PIN_SET);  // Turn LED1 off
+        motor_enabled = 1;
+    }
+    else
+    {
+        HAL_GPIO_WritePin(GPIOB, GPIO_PIN_2, GPIO_PIN_SET);    // Disable motor driver
+        HAL_GPIO_WritePin(LED1_PORT, LED1_BIT, GPIO_PIN_RESET); // Turn LED1 on
+        motor_enabled = 0;
+    }
+}
+
+void motor_set_direction(uint8_t direction)
+{
+    if(direction == 0)  // Forward
+    {
+        HAL_GPIO_WritePin(GPIOB, GPIO_PIN_4, GPIO_PIN_SET);   // IN1 high
+    }
+    else  // Reverse
+    {
+        HAL_GPIO_WritePin(GPIOB, GPIO_PIN_4, GPIO_PIN_RESET); // IN1 low
+    }
+    motor_direction = direction;
+}
+
+/* USER CODE END 4 */
+
+/**
+  * @brief  This function is executed in case of error occurrence.
+  * @retval None
+  */
+void Error_Handler(void)
+{
+  /* USER CODE BEGIN Error_Handler_Debug */
+  /* User can add his own implementation to report the HAL error return state */
+
+  /* USER CODE END Error_Handler_Debug */
+}
+
+#ifdef  USE_FULL_ASSERT
+/**
+  * @brief  Reports the name of the source file and the source line number
+  *         where the assert_param error has occurred.
+  * @param  file: pointer to the source file name
+  * @param  line: assert_param error line source number
+  * @retval None
+  */
+void assert_failed(uint8_t *file, uint32_t line)
+{
+  /* USER CODE BEGIN 6 */
+  /* User can add his own implementation to report the file name and line number,
+     tex: printf("Wrong parameters value: file %s on line %d\r\n", file, line) */
+  /* USER CODE END 6 */
+}
+#endif /* USE_FULL_ASSERT */
+
+/************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/
