@@ -39,10 +39,6 @@
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
 
-typedef struct {
-    uint8_t speed;    // 0-100%
-    uint8_t direction; // 0 = forward, 1 = reverse
-} MotorControl_t;
 
 /* USER CODE END PTD */
 
@@ -68,20 +64,8 @@ uint8_t motor_enabled = 0;    // 0 = disabled, 1 = enabled
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 /* USER CODE BEGIN PFP */
-
 void motor_enable(void);
 void motor_set_direction(uint8_t direction);
-void motor_control(uint8_t btn1, uint8_t btn1_old, uint8_t btn2, uint8_t btn2_old);
-uint8_t calculate_pwm_percentage(uint16_t adc_value);
-uint16_t scale_adc_to_servo(uint16_t adc_value);
-void convert_adc_to_motor(uint16_t adc_value, MotorControl_t* motor_control);
-uint8_t is_button_pressed(uint8_t button_number);
-void decrement_servo_angle(int16_t* current_angle, uint8_t fine_mode);
-void increment_servo_angle(int16_t* current_angle, uint8_t fine_mode);
-void display_status(uint8_t motor_speed, uint8_t motor_direction, int16_t servo_angle);
-void control_dc_motor(uint8_t speed, uint8_t direction);
-void control_servo(int16_t angle);
-
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -110,17 +94,17 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 // Valeure lue en LSB
 //**************************************************************
 // Lecture d'un canal AD par polling
-// Il faut auparavant avoir configuré la/les pin(s) concernée(s) en entrée analogique
+// Il faut auparavant avoir configur� la/les pin(s) concern�e(s) en entr�e analogique
 uint16_t Adc_read(uint8_t chNr)
 {
-    uint16_t ValRetour;
-    hadc.Instance->CHSELR = ADC_CHSELR_CHANNEL(chNr);  
-    
-    HAL_ADC_Start(&hadc);
-    HAL_ADC_PollForConversion(&hadc, HAL_MAX_DELAY);
-    ValRetour = HAL_ADC_GetValue(&hadc);
-    HAL_ADC_Stop(&hadc);
-    return(ValRetour);
+	  uint16_t ValRetour;
+		hadc.Instance->CHSELR = ADC_CHSELR_CHANNEL(chNr);  
+	
+		HAL_ADC_Start(&hadc);
+		HAL_ADC_PollForConversion(&hadc, HAL_MAX_DELAY);
+		ValRetour = HAL_ADC_GetValue(&hadc);
+		HAL_ADC_Stop(&hadc);
+		return(ValRetour);
 }
 
 // ----------------------------------------------------------------
@@ -151,8 +135,6 @@ int main(void)
 	uint8_t Btn1_Old;       // Previous state of button 1
 	uint8_t Btn2;           // Current state of button 2
 	uint8_t Btn2_Old;       // Previous state of button 2
-	uint8_t fine_mode = 0;
-	int16_t servo_angle = 0;
 	// *** A COMPLETER ! ***
 	
 
@@ -184,7 +166,7 @@ int main(void)
 	
   /* USER CODE BEGIN 2 */
 	
-	// Start timers
+		// Start timers
 	HAL_TIM_Base_Start_IT(&htim6);  //Start Timer 6 for LED blinking
 	HAL_TIM_PWM_Start(&htim16, TIM_CHANNEL_1); //Start Timer 16 PWM on PB8
 	HAL_TIM_PWM_Start(&htim17, TIM_CHANNEL_1); //Start Timer 16 PWM on PB8
@@ -202,35 +184,60 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+		//lcd_b1_on();
 		
-    // Update button states
-    Btn1 = is_button_pressed(1);
-    Btn2 = is_button_pressed(2);
+		// Read current button states
+		Btn0 = HAL_GPIO_ReadPin(BTN0_PORT, BTN0_BIT);
+		Btn1 = HAL_GPIO_ReadPin(BTN1_PORT, BTN1_BIT);
+		Btn2 = HAL_GPIO_ReadPin(BTN2_PORT, BTN2_BIT);
 		
-		// Read ADC and convert to motor control
-    uint16_t adc_value = Adc_read(0);
-    MotorControl_t motor_control;
-    convert_adc_to_motor(adc_value, &motor_control);
-    
-    // Control DC motor
-    control_dc_motor(motor_control.speed, motor_control.direction);
-    
-    // Handle servo control with buttons
-    if(is_button_pressed(0)) {  // Mode toggle button
-        fine_mode = !fine_mode;
-    }
-    if(is_button_pressed(1)) {  // Decrement button
-        decrement_servo_angle(&servo_angle, fine_mode);
-    }
-    if(is_button_pressed(2)) {  // Increment button
-        increment_servo_angle(&servo_angle, fine_mode);
-    }
-    
-    // Control servo
-    control_servo(servo_angle);
-    
-    // Display status
-    display_status(motor_control.speed, motor_control.direction, servo_angle);
+		__HAL_TIM_SET_COMPARE(&htim16, TIM_CHANNEL_1, duty_cycle);  // Set PWM duty cycle for Servo
+		__HAL_TIM_SET_COMPARE(&htim17, TIM_CHANNEL_1, duty_cycle);  // Set PWM duty cycle
+
+		// Partie ADC
+		uint16_t adc_value = Adc_read(0);  // channel_number is which pin you want to read
+		duty_cycle = adc_value /14;
+		
+		//lcd_clearLine(1);
+		lcd_gotoxy(1,1);
+		printf_lcd("%d ", adc_value);
+		//lcd_clearLine(2);
+		lcd_gotoxy(1,2);
+		printf_lcd("%d ", duty_cycle);
+		//lcd_clearLine(1);
+		HAL_GPIO_WritePin(LED0_PORT, LED0_BIT, GPIO_PIN_RESET);	// Turn led 0 on GPIO_PIN_SET GPIO_PIN_RESET
+		
+		
+		// ---Partie pour le moteur--- //
+		
+	//		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_2, GPIO_PIN_SET);  // Enable motor driver (nSLEEP active low) GPIO_PIN_RESET
+//		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_4, GPIO_PIN_SET);   // IN1 high direction
+
+		// Motor control section
+		if((Btn1 != Btn1_Old) && (Btn1 == 0))  // Button 1 pressed (active low)
+		{
+			motor_enable();  // Toggle motor enable state
+		}
+		
+		// Motor Direction
+		if((Btn2 != Btn2_Old) && (Btn2 == 0))  // Button 2 pressed (active low)
+		{
+			if(motor_direction == 0)
+			{
+				motor_set_direction(1);  // Change to reverse
+				HAL_GPIO_WritePin(LED2_PORT, LED2_BIT, GPIO_PIN_SET);	// Turn led 2 off GPIO_PIN_SET GPIO_PIN_RESET
+			}
+			else
+			{
+				motor_set_direction(0);  // Change to forward
+				HAL_GPIO_WritePin(LED2_PORT, LED2_BIT, GPIO_PIN_RESET);	// Turn led 2 on GPIO_PIN_SET GPIO_PIN_RESET
+			}
+		}
+		
+		// Update previous button states
+		Btn0_Old = Btn0;
+		Btn1_Old = Btn1;
+		Btn2_Old = Btn2;
   }
   /* USER CODE END 3 */
 }
@@ -307,119 +314,6 @@ void motor_set_direction(uint8_t direction)
         HAL_GPIO_WritePin(GPIOB, GPIO_PIN_4, GPIO_PIN_RESET); // IN1 low
     }
     motor_direction = direction;
-}
-
-void motor_control(uint8_t btn1, uint8_t btn1_old, uint8_t btn2, uint8_t btn2_old)
-{
-    // Motor Enable/Disable control
-    if((btn1 != btn1_old) && (btn1 == 0))  // Button 1 pressed (active low)
-    {
-        motor_enable();  // Toggle motor enable state
-    }
-    
-    // Motor Direction control
-    if((btn2 != btn2_old) && (btn2 == 0))  // Button 2 pressed (active low)
-    {
-        if(motor_direction == 0)
-        {
-            motor_set_direction(1);  // Change to reverse
-            HAL_GPIO_WritePin(LED2_PORT, LED2_BIT, GPIO_PIN_SET);    // Turn LED2 off
-        }
-        else
-        {
-            motor_set_direction(0);  // Change to forward
-            HAL_GPIO_WritePin(LED2_PORT, LED2_BIT, GPIO_PIN_RESET);  // Turn LED2 on
-        }
-    }
-}
-
-uint8_t calculate_pwm_percentage(uint16_t adc_value)
-{
-    // ADC value is 0-4095 (12-bit ADC)
-    // Convert to percentage (0-100)
-    uint8_t percentage = (adc_value * 100) / 4095;
-    return percentage;
-}
-
-uint16_t scale_adc_to_servo(uint16_t adc_value)
-{
-    // ADC range: 0-4095
-    // Servo PWM range: 0-1000 (typical for many servos)
-    // Scale ADC to servo range
-    return (adc_value * 1000) / 4095;
-}
-
-void convert_adc_to_motor(uint16_t adc_value, MotorControl_t* motor_control)
-{
-    // Convert ADC (0-4095) to speed (0-100%)
-    motor_control->speed = (adc_value * 100) / 4095;
-    
-    // Determine direction based on ADC value
-    // For example: values below 2048 are reverse, above are forward
-    motor_control->direction = (adc_value < 2048) ? 1 : 0;
-}
-
-uint8_t is_button_pressed(uint8_t button_number)
-{
-    switch(button_number) {
-        case 0:
-            return (HAL_GPIO_ReadPin(BTN0_PORT, BTN0_BIT) == 0);
-        case 1:
-            return (HAL_GPIO_ReadPin(BTN1_PORT, BTN1_BIT) == 0);
-        case 2:
-            return (HAL_GPIO_ReadPin(BTN2_PORT, BTN2_BIT) == 0);
-        default:
-            return 0;
-    }
-}
-
-void decrement_servo_angle(int16_t* current_angle, uint8_t fine_mode)
-{
-    if(fine_mode) {
-        *current_angle -= 1;   // Fine mode: 1 degree
-    } else {
-        *current_angle -= 45;  // Coarse mode: 45 degrees
-    }
-    
-    // Keep within valid range
-    if(*current_angle < -180) *current_angle = -180;
-}
-
-void increment_servo_angle(int16_t* current_angle, uint8_t fine_mode)
-{
-    if(fine_mode) {
-        *current_angle += 1;   // Fine mode: 1 degree
-    } else {
-        *current_angle += 45;  // Coarse mode: 45 degrees
-    }
-    
-    // Keep within valid range
-    if(*current_angle > 180) *current_angle = 180;
-}
-
-void display_status(uint8_t motor_speed, uint8_t motor_direction, int16_t servo_angle)
-{
-    lcd_gotoxy(1,1);
-    printf_lcd("Motor: %d%% %s", motor_speed, motor_direction ? "REV" : "FWD");
-    lcd_gotoxy(1,2);
-    printf_lcd("Servo: %d°", servo_angle);
-}
-
-void control_dc_motor(uint8_t speed, uint8_t direction)
-{
-    // Set direction
-    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_4, direction ? GPIO_PIN_RESET : GPIO_PIN_SET);
-    
-    // Set speed (PWM)
-    uint16_t pwm_value = (speed * 1000) / 100; // Convert percentage to PWM value
-    __HAL_TIM_SET_COMPARE(&htim16, TIM_CHANNEL_1, pwm_value);
-}
-
-void control_servo(int16_t angle)
-{
-    // Convert angle (-180 to +180) to PWM value (1000 to 2000)
-    uint16_t pwm_value = 1500 + (angle * 500 / 180);
-    __HAL_TIM_SET_COMPARE(&htim17, TIM_CHANNEL_1, pwm_value);
 }
 
 /* USER CODE END 4 */
