@@ -1,0 +1,5 @@
+﻿  main.c
+C:\HM\Programation\C\EX\Test-end me\Test-end me\main.c(26,27): warning C4047: 'fonction' : les niveaux d'indirection de 'FILE **' et de 'char [9]' sont différents
+C:\HM\Programation\C\EX\Test-end me\Test-end me\main.c(26,17): warning C4024: 'fopen_s' : types différents pour le paramètre formel et réel 1
+C:\HM\Programation\C\EX\Test-end me\Test-end me\main.c(26,8): error C2198: 'fopen_s' : pas assez d'arguments pour un appel
+C:\HM\Programation\C\EX\Test-end me\Test-end me\main.c(26,33): warning C4047: '=' : les niveaux d'indirection de 'FILE *' et de 'errno_t' sont différents
