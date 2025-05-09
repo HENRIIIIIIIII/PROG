@@ -59,16 +59,20 @@
 uint32_t led_counter = 0;  // Counter for LED blinking
 uint8_t motor_direction = 0;  // 0 = forward, 1 = reverse
 uint8_t motor_enabled = 0;    // 0 = disabled, 1 = enabled
+int16_t servo_angle = 0;      // Current servo angle
+uint8_t servo_mode = 0;       // 0 = fine mode (1°), 1 = coarse mode (45°)
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 /* USER CODE BEGIN PFP */
-//void motor_enable(void);
-//void motor_set_direction(uint8_t direction);
-//void motor_control(uint8_t Btn1, uint8_t Btn1_old, uint8_t Btn2, uint8_t Btn2_old);
+void motor_enable(void);
+void motor_set_direction(uint8_t direction);
+void motor_control(uint8_t btn1, uint8_t btn1_old, uint8_t btn2, uint8_t btn2_old);
+
 uint8_t calculate_pwm_percentage(uint16_t adc_value);
 uint16_t scale_adc_to_servo(uint16_t adc_value);
+void servo_control(uint8_t btn0, uint8_t btn0_old, uint8_t btn1, uint8_t btn1_old, uint8_t btn2, uint8_t btn2_old, uint8_t btn3, uint8_t btn3_old);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -97,7 +101,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 // Valeure lue en LSB
 //**************************************************************
 // Lecture d'un canal AD par polling
-// Il faut auparavant avoir configur� la/les pin(s) concern�e(s) en entr�e analogique
+// Il faut auparavant avoir configuré la/les pin(s) concernée(s) en entrée analogique
 uint16_t Adc_read(uint8_t chNr)
 {
 	  uint16_t ValRetour;
@@ -138,11 +142,8 @@ int main(void)
 	uint8_t Btn1_Old;       // Previous state of button 1
 	uint8_t Btn2;           // Current state of button 2
 	uint8_t Btn2_Old;       // Previous state of button 2
-	uint8_t Btn3;           // Current state of button 2
-	uint8_t Btn3_Old;       // Previous state of button 2
-	uint8_t fine_mode;			// For the mode of incrementation
-	uint8_t current_angle = 0;
-	uint8_t Max_angle = 180;
+	uint8_t Btn3;           // Current state of button 3
+	uint8_t Btn3_Old;       // Previous state of button 3
 	// *** A COMPLETER ! ***
 	
 
@@ -171,7 +172,6 @@ int main(void)
   MX_ADC_Init();
   MX_TIM17_Init();
 	lcd_init();
-	
   /* USER CODE BEGIN 2 */
 	
 	// Start timers
@@ -188,119 +188,42 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-		
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-		//lcd_b1_on();
-		
-		// Read current button states
-		Btn0 = HAL_GPIO_ReadPin(BTN0_PORT, BTN0_BIT);
-		Btn1 = HAL_GPIO_ReadPin(BTN1_PORT, BTN1_BIT);
-		Btn2 = HAL_GPIO_ReadPin(BTN2_PORT, BTN2_BIT);
-		Btn3 = HAL_GPIO_ReadPin(BTN3_PORT, BTN3_BIT);
-		
-		__HAL_TIM_SET_COMPARE(&htim16, TIM_CHANNEL_1, duty_cycle);  // Set PWM duty cycle for motor
-		//__HAL_TIM_SET_COMPARE(&htim17, TIM_CHANNEL_1, duty_cycle);  // Set PWM duty cycle for servo
-
-		// Partie ADC
-		uint16_t adc_value = Adc_read(0);  // Reads the direct value of are ADC
-		duty_cycle = scale_adc_to_servo(adc_value);  // Scale ADC to servo range
-		uint8_t pwm_percentage = calculate_pwm_percentage(adc_value);
-		
-		// ---Partie pour le servo--- //
-		// Btn1 décrémente l’angle
-    if((Btn0 != Btn0_Old) && (Btn0 == 0))  // Button 0 pressed (active low)
-    {
-			// test what mode we are in
-			if(fine_mode == 0)
-			{
-				fine_mode = 1;
-				HAL_GPIO_WritePin(LED0_PORT, LED0_BIT, GPIO_PIN_RESET);	// Turn led 0 on GPIO_PIN_SET GPIO_PIN_RESET
-			}
-			else
-			{
-				fine_mode = 0;
-				HAL_GPIO_WritePin(LED0_PORT, LED0_BIT, GPIO_PIN_SET);	// Turn led 0 on GPIO_PIN_SET GPIO_PIN_RESET
-			}
-			
-    }
-		
-		// Btn1 décrémente l’angle
-    if((Btn1 != Btn1_Old) && (Btn1 == 0))  // Button 1 pressed (active low)
-    {
-			if(fine_mode == 1) 
-			{
-					current_angle -= 1;   // Fine mode: 1 degree
-			} 
-			else 
-			{
-					current_angle -= 45;  // Coarse mode: 45 degrees
-			}
-			
-			// Keep within valid range
-			if(current_angle <= -Max_angle)
-			{
-				current_angle = -Max_angle;
-			}
-    }		
-		
-		// Btn2 incrémente l’angle
-		if((Btn2 != Btn2_Old) && (Btn2 == 0))  // Button 1 pressed (active low)
-    {
-			if(fine_mode == 1)  
-			{
-					current_angle = 1;   // Fine mode: 1 degree
-			} 
-			else 
-			{
-					current_angle = 45;  // Coarse mode: 45 degrees
-			}
-			
-			// Keep within valid range
-			if(current_angle >= Max_angle)
-			{
-				current_angle = Max_angle;
-			}
-    }
-		
-		// Btn3 remet l’angle à 0°
-		if((Btn3 != Btn3_Old) && (Btn3 == 0))  // Button 1 pressed (active low)
-    {
-					current_angle = 0;  // Coarse mode: 45 degrees
-    }
-		
-		// Il faut la remetre dans le correct format
-
-		//current_angle = (current_angle * 4095) / 100;
-		// Convert angle (-180 to +180) to PWM value (1000 to 2000)
-    current_angle = 1500 + (current_angle * 500 / 180);
-    __HAL_TIM_SET_COMPARE(&htim17, TIM_CHANNEL_1, current_angle);
-		
-		//lcd_clearLine(1);
-		lcd_gotoxy(1,2);
-		printf_lcd("ADC: %d ", adc_value);
-		lcd_gotoxy(1,1);
-		printf_lcd("Angle: %d ", current_angle);
-
-//		//lcd_clearLine(2);
-//		lcd_gotoxy(1,2);
-//		printf_lcd("PWM: %d%% ", pwm_percentage);
-//		lcd_gotoxy(1,3);
-//		printf_lcd("Angle: %d ", current_angle);
-		//printf_lcd("Duty: %d ", duty_cycle);
-		//lcd_clearLine(1);
-		
-		
-		// ---Partie pour le moteur--- //
-		// Motor control section
-		//motor_control(Btn1, Btn1_Old, Btn2, Btn2_Old);
-		
-		// Update previous button states
-		Btn0_Old = Btn0;
-		Btn1_Old = Btn1;
-		Btn2_Old = Btn2;
-		Btn3_Old = Btn3;
+    // Read current button states
+    Btn0 = HAL_GPIO_ReadPin(BTN0_PORT, BTN0_BIT);
+    Btn1 = HAL_GPIO_ReadPin(BTN1_PORT, BTN1_BIT);
+    Btn2 = HAL_GPIO_ReadPin(BTN2_PORT, BTN2_BIT);
+    Btn3 = HAL_GPIO_ReadPin(BTN3_PORT, BTN3_BIT);
+    
+    // ----------------------------------------------------------------
+    // Section 1: Motor Control with ADC
+    uint16_t adc_value = Adc_read(0);  // Read ADC value from channel 0
+    duty_cycle = scale_adc_to_servo(adc_value);  // Scale ADC to servo range
+    uint8_t pwm_percentage = calculate_pwm_percentage(adc_value);
+    
+    // Set PWM for motor control
+    __HAL_TIM_SET_COMPARE(&htim16, TIM_CHANNEL_1, duty_cycle);  // Set PWM duty cycle for Motor
+    
+    // Display ADC and PWM values
+    lcd_gotoxy(1,1);
+    printf_lcd("ADC: %d ", adc_value);
+    //lcd_gotoxy(1,2);
+    //printf_lcd("PWM: %d%% ", pwm_percentage);
+     // Display current angle and mode
+    lcd_gotoxy(1,2);
+    printf_lcd("Angle: %d%%° Mode: %s", pwm_percentage, servo_mode ? "45°" : "1°");
+    // ----------------------------------------------------------------
+    // Section 2: Servo Control with Buttons
+    // Control servo with buttons
+    servo_control(Btn0, Btn0_Old, Btn1, Btn1_Old, Btn2, Btn2_Old, Btn3, Btn3_Old);
+    
+    // Update previous button states
+    Btn0_Old = Btn0;
+    Btn1_Old = Btn1;
+    Btn2_Old = Btn2;
+    Btn3_Old = Btn3;
   }
   /* USER CODE END 3 */
 }
@@ -350,58 +273,58 @@ void SystemClock_Config(void)
 
 // ----------------------------------------------------------------
 // *** Motor Control Functions ***
-//void motor_enable(void)
-//{
-//    if(motor_enabled == 0)
-//    {
-//        HAL_GPIO_WritePin(GPIOB, GPIO_PIN_2, GPIO_PIN_RESET);  // Enable motor driver (nSLEEP active low)
-//        HAL_GPIO_WritePin(LED1_PORT, LED1_BIT, GPIO_PIN_SET);  // Turn LED1 off
-//        motor_enabled = 1;
-//    }
-//    else
-//    {
-//        HAL_GPIO_WritePin(GPIOB, GPIO_PIN_2, GPIO_PIN_SET);    // Disable motor driver
-//        HAL_GPIO_WritePin(LED1_PORT, LED1_BIT, GPIO_PIN_RESET); // Turn LED1 on
-//        motor_enabled = 0;
-//    }
-//}
+void motor_enable(void)
+{
+    if(motor_enabled == 0)
+    {
+        HAL_GPIO_WritePin(GPIOB, GPIO_PIN_2, GPIO_PIN_RESET);  // Enable motor driver (nSLEEP active low)
+        HAL_GPIO_WritePin(LED1_PORT, LED1_BIT, GPIO_PIN_SET);  // Turn LED1 off
+        motor_enabled = 1;
+    }
+    else
+    {
+        HAL_GPIO_WritePin(GPIOB, GPIO_PIN_2, GPIO_PIN_SET);    // Disable motor driver
+        HAL_GPIO_WritePin(LED1_PORT, LED1_BIT, GPIO_PIN_RESET); // Turn LED1 on
+        motor_enabled = 0;
+    }
+}
 
-//void motor_set_direction(uint8_t direction)
-//{
-//    if(direction == 0)  // Forward
-//    {
-//        HAL_GPIO_WritePin(GPIOB, GPIO_PIN_4, GPIO_PIN_SET);   // IN1 high
-//    }
-//    else  // Reverse
-//    {
-//        HAL_GPIO_WritePin(GPIOB, GPIO_PIN_4, GPIO_PIN_RESET); // IN1 low
-//    }
-//    motor_direction = direction;
-//}
+void motor_set_direction(uint8_t direction)
+{
+    if(direction == 0)  // Forward
+    {
+        HAL_GPIO_WritePin(GPIOB, GPIO_PIN_4, GPIO_PIN_SET);   // IN1 high
+    }
+    else  // Reverse
+    {
+        HAL_GPIO_WritePin(GPIOB, GPIO_PIN_4, GPIO_PIN_RESET); // IN1 low
+    }
+    motor_direction = direction;
+}
 
-//void motor_control(uint8_t Btn1, uint8_t Btn1_old, uint8_t Btn2, uint8_t Btn2_old)
-//{
-//    // Motor Enable/Disable control
-//    if((Btn1 != Btn1_old) && (Btn1 == 0))  // Button 1 pressed (active low)
-//    {
-//        motor_enable();  // Toggle motor enable state
-//    }
-//    
-//    // Motor Direction control
-//    if((Btn2 != Btn2_old) && (Btn2 == 0))  // Button 2 pressed (active low)
-//    {
-//        if(motor_direction == 0)
-//        {
-//            motor_set_direction(1);  // Change to reverse
-//            HAL_GPIO_WritePin(LED2_PORT, LED2_BIT, GPIO_PIN_SET);    // Turn LED2 off
-//        }
-//        else
-//        {
-//            motor_set_direction(0);  // Change to forward
-//            HAL_GPIO_WritePin(LED2_PORT, LED2_BIT, GPIO_PIN_RESET);  // Turn LED2 on
-//        }
-//    }
-//}
+void motor_control(uint8_t btn1, uint8_t btn1_old, uint8_t btn2, uint8_t btn2_old)
+{
+    // Motor Enable/Disable control
+    if((btn1 != btn1_old) && (btn1 == 0))  // Button 1 pressed (active low)
+    {
+        motor_enable();  // Toggle motor enable state
+    }
+    
+    // Motor Direction control
+    if((btn2 != btn2_old) && (btn2 == 0))  // Button 2 pressed (active low)
+    {
+        if(motor_direction == 0)
+        {
+            motor_set_direction(1);  // Change to reverse
+            HAL_GPIO_WritePin(LED2_PORT, LED2_BIT, GPIO_PIN_SET);    // Turn LED2 off
+        }
+        else
+        {
+            motor_set_direction(0);  // Change to forward
+            HAL_GPIO_WritePin(LED2_PORT, LED2_BIT, GPIO_PIN_RESET);  // Turn LED2 on
+        }
+    }
+}
 
 uint8_t calculate_pwm_percentage(uint16_t adc_value)
 {
@@ -417,6 +340,52 @@ uint16_t scale_adc_to_servo(uint16_t adc_value)
     // Servo PWM range: 0-1000 (typical for many servos)
     // Scale ADC to servo range
     return (adc_value * 1000) / 4095;
+}
+
+void servo_control(uint8_t btn0, uint8_t btn0_old, uint8_t btn1, uint8_t btn1_old, uint8_t btn2, uint8_t btn2_old, uint8_t btn3, uint8_t btn3_old)
+{
+    // Button 0: Toggle between fine (1°) and coarse (45°) modes
+    if((btn0 != btn0_old) && (btn0 == 0))
+    {
+        servo_mode = !servo_mode;
+        // Indicate mode change with LED
+        if(servo_mode)
+            HAL_GPIO_WritePin(LED0_PORT, LED0_BIT, GPIO_PIN_SET);    // Coarse mode
+        else
+            HAL_GPIO_WritePin(LED0_PORT, LED0_BIT, GPIO_PIN_RESET);  // Fine mode
+    }
+
+    // Button 1: Decrease angle
+    if((btn1 != btn1_old) && (btn1 == 0))
+    {
+        if(servo_mode)
+            servo_angle -= 45;  // Coarse mode
+        else
+            servo_angle -= 1;   // Fine mode
+    }
+
+    // Button 2: Increase angle
+    if((btn2 != btn2_old) && (btn2 == 0))
+    {
+        if(servo_mode)
+            servo_angle += 45;  // Coarse mode
+        else
+            servo_angle += 1;   // Fine mode
+    }
+
+    // Button 3: Reset to 0°
+    if((btn3 != btn3_old) && (btn3 == 0))
+    {
+        servo_angle = 0;
+    }
+
+    // Keep angle within valid range (-180° to +180°)
+    if(servo_angle > 180) servo_angle = 180;
+    if(servo_angle < -180) servo_angle = -180;
+
+    // Convert angle to PWM value (assuming 0° = 1500, ±180° = ±500)
+    uint16_t pwm_value = 1500 + (servo_angle * 500 / 180);
+    __HAL_TIM_SET_COMPARE(&htim16, TIM_CHANNEL_1, pwm_value);
 }
 
 /* USER CODE END 4 */

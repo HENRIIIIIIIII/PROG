@@ -363,12 +363,12 @@ ARM Macro Assembler    Page 6
               00000000 
 Command Line: --debug --xref --diag_suppress=9931 --cpu=Cortex-M0 --apcs=interw
 ork --depend=tp_pwm\startup_stm32f051x8.d -otp_pwm\startup_stm32f051x8.o -I.\RT
-E\_Tp_Pwm -IC:\Keil_v5l\Arm\Pack\ARM\CMSIS\6.1.0\CMSIS\Core\Include -IC:\Keil_v
-5l\Arm\Pack\Keil\STM32F0xx_DFP\2.1.0\Drivers\CMSIS\Device\ST\STM32F0xx\Include 
---predefine="__EVAL SETA 1" --predefine="__MICROLIB SETA 1" --predefine="__UVIS
-ION_VERSION SETA 533" --predefine="_RTE_ SETA 1" --predefine="STM32F051x8 SETA 
-1" --predefine="_RTE_ SETA 1" --list=startup_stm32f051x8.lst startup_stm32f051x
-8.s
+E\_Tp_Pwm -IC:\Keil_v5\Arm\Pack\ARM\CMSIS\5.7.0\CMSIS\Core\Include -IC:\Keil_v5
+\Arm\Pack\Keil\STM32F0xx_DFP\2.1.1\Drivers\CMSIS\Device\ST\STM32F0xx\Include --
+predefine="__EVAL SETA 1" --predefine="__MICROLIB SETA 1" --predefine="__UVISIO
+N_VERSION SETA 533" --predefine="_RTE_ SETA 1" --predefine="STM32F051x8 SETA 1"
+ --predefine="_RTE_ SETA 1" --list=startup_stm32f051x8.lst startup_stm32f051x8.
+s
 
 
 
