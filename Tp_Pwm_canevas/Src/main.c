@@ -68,7 +68,6 @@ void SystemClock_Config(void);
 //void motor_set_direction(uint8_t direction);
 //void motor_control(uint8_t Btn1, uint8_t Btn1_old, uint8_t Btn2, uint8_t Btn2_old);
 uint8_t calculate_pwm_percentage(uint16_t adc_value);
-uint16_t scale_adc_to_servo(uint16_t adc_value);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -141,8 +140,11 @@ int main(void)
 	uint8_t Btn3;           // Current state of button 2
 	uint8_t Btn3_Old;       // Previous state of button 2
 	uint8_t fine_mode;			// For the mode of incrementation
-	uint8_t current_angle = 0;
-	uint8_t Max_angle = 180;
+	uint16_t current_angle = 0;
+	uint16_t pwm_value = 0;
+//	uint8_t current_angle = 0;
+//	uint8_t pwm_value = 0;
+	uint8_t Max_angle = 90;
 	// *** A COMPLETER ! ***
 	
 
@@ -170,10 +172,8 @@ int main(void)
   MX_TIM16_Init();
   MX_ADC_Init();
   MX_TIM17_Init();
-	lcd_init();
-	
   /* USER CODE BEGIN 2 */
-	
+	lcd_init();
 	// Start timers
 	HAL_TIM_Base_Start_IT(&htim6);  //Start Timer 6 for LED blinking
 	HAL_TIM_PWM_Start(&htim16, TIM_CHANNEL_1); //Start Timer 16 PWM on PB8
@@ -205,7 +205,7 @@ int main(void)
 
 		// Partie ADC
 		uint16_t adc_value = Adc_read(0);  // Reads the direct value of are ADC
-		duty_cycle = scale_adc_to_servo(adc_value);  // Scale ADC to servo range
+		//duty_cycle = scale_adc_to_servo(adc_value);  // Scale ADC to servo range
 		uint8_t pwm_percentage = calculate_pwm_percentage(adc_value);
 		
 		// ---Partie pour le servo--- //
@@ -229,39 +229,46 @@ int main(void)
 		// Btn1 décrémente l’angle
     if((Btn1 != Btn1_Old) && (Btn1 == 0))  // Button 1 pressed (active low)
     {
-			if(fine_mode == 1) 
+			if((fine_mode == 1) && (current_angle > 0))
 			{
 					current_angle -= 1;   // Fine mode: 1 degree
 			} 
-			else 
+			else if(current_angle >= 10)
 			{
-					current_angle -= 45;  // Coarse mode: 45 degrees
+					current_angle -= 10;  // Coarse mode: 45 degrees
+			}
+			else
+			{
+				current_angle = 0;
 			}
 			
 			// Keep within valid range
-			if(current_angle <= -Max_angle)
-			{
-				current_angle = -Max_angle;
-			}
+//			if(current_angle <= -90)
+//			{
+//				current_angle = 0;
+//			}
     }		
 		
 		// Btn2 incrémente l’angle
 		if((Btn2 != Btn2_Old) && (Btn2 == 0))  // Button 1 pressed (active low)
     {
-			if(fine_mode == 1)  
+			if((fine_mode == 1) && (current_angle < Max_angle))  
 			{
-					current_angle = 1;   // Fine mode: 1 degree
+					current_angle += 1;   // Fine mode: 1 degree
 			} 
-			else 
+			else if(current_angle <= 90)
 			{
-					current_angle = 45;  // Coarse mode: 45 degrees
+					current_angle += 10;  // Coarse mode: 45 degrees
 			}
-			
+			else
+			{
+				current_angle = 90;
+			}
 			// Keep within valid range
-			if(current_angle >= Max_angle)
-			{
-				current_angle = Max_angle;
-			}
+//			if(current_angle >= Max_angle)
+//			{
+//				current_angle = Max_angle;
+//			}
     }
 		
 		// Btn3 remet l’angle à 0°
@@ -273,16 +280,18 @@ int main(void)
 		// Il faut la remetre dans le correct format
 
 		//current_angle = (current_angle * 4095) / 100;
-		// Convert angle (-180 to +180) to PWM value (1000 to 2000)
-    current_angle = 1500 + (current_angle * 500 / 180);
-    __HAL_TIM_SET_COMPARE(&htim17, TIM_CHANNEL_1, current_angle);
+		// Convert angle (-180 to +180) to PWM value (1000 to 2000)s
+//    pwm_value = 1500 + (current_angle * 500 / 180);
+//		
+//    __HAL_TIM_SET_COMPARE(&htim17, TIM_CHANNEL_1, pwm_value);
+		uint16_t scaled_pwm_value = (pwm_value * htim17.Init.Period) / 2000;
+		__HAL_TIM_SET_COMPARE(&htim17, TIM_CHANNEL_1, scaled_pwm_value);
 		
 		//lcd_clearLine(1);
 		lcd_gotoxy(1,2);
-		printf_lcd("ADC: %d ", adc_value);
+		printf_lcd("pwm_value: %d ", pwm_value);
 		lcd_gotoxy(1,1);
-		printf_lcd("Angle: %d ", current_angle);
-
+		printf_lcd("pwm: %d, CCR1: %d\n", pwm_value, __HAL_TIM_GET_COMPARE(&htim17, TIM_CHANNEL_1));
 //		//lcd_clearLine(2);
 //		lcd_gotoxy(1,2);
 //		printf_lcd("PWM: %d%% ", pwm_percentage);
@@ -409,14 +418,6 @@ uint8_t calculate_pwm_percentage(uint16_t adc_value)
     // Convert to percentage (0-100)
     uint8_t percentage = (adc_value * 100) / 4095;
     return percentage;
-}
-
-uint16_t scale_adc_to_servo(uint16_t adc_value)
-{
-    // ADC range: 0-4095
-    // Servo PWM range: 0-1000 (typical for many servos)
-    // Scale ADC to servo range
-    return (adc_value * 1000) / 4095;
 }
 
 /* USER CODE END 4 */

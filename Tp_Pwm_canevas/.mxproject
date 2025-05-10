@@ -7,8 +7,8 @@ HeaderPath=..\Drivers\STM32F0xx_HAL_Driver\Inc;..\Drivers\STM32F0xx_HAL_Driver\I
 CDefines=USE_HAL_DRIVER;STM32F051x8;USE_HAL_DRIVER;USE_HAL_DRIVER;
 
 [PreviousGenFiles]
-HeaderPath=C:/HM/Programation/C/Tp_Pwm_canevas/Inc
+HeaderPath=C:/Users/henmott/Code/PROG/Tp_Pwm_canevas/Inc
 HeaderFiles=gpio.h;adc.h;tim.h;stm32f0xx_it.h;stm32f0xx_hal_conf.h;main.h;
-SourcePath=C:/HM/Programation/C/Tp_Pwm_canevas/Src
+SourcePath=C:/Users/henmott/Code/PROG/Tp_Pwm_canevas/Src
 SourceFiles=gpio.c;adc.c;tim.c;stm32f0xx_it.c;stm32f0xx_hal_msp.c;main.c;
 
